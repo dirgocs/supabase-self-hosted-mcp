@@ -10,7 +10,7 @@ services:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - PORT=3000
-      - NODE_ENV=production
+      - GIN_MODE=release
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
