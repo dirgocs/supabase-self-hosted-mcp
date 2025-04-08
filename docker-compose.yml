@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  supabase-mcp:
+    build: .
+    container_name: supabase-mcp-server
+    ports:
+      - "3000:3000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - PORT=3000
+      - NODE_ENV=production
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
