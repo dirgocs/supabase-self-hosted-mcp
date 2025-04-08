@@ -1,17 +1,31 @@
-FROM node:18-alpine
+# Build stage
+FROM golang:1.21-alpine AS build
 
-# Criar diretório da aplicação
 WORKDIR /app
 
-# Instalar dependências
-COPY package*.json ./
-RUN npm install
+# Install dependencies
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Copiar código fonte
+# Copy source code
 COPY . .
 
-# Expor porta
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server/main.go
+
+# Run stage
+FROM alpine:latest
+
+WORKDIR /app
+
+# Copy the binary from the build stage
+COPY --from=build /app/server .
+
+# Copy necessary files
+COPY --from=build /app/.env.example ./.env
+
+# Expose the port
 EXPOSE 3000
 
-# Comando para iniciar a aplicação
-CMD ["node", "index.js"]
+# Run the application
+CMD ["./server"]
