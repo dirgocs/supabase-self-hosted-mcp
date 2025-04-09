@@ -1,16 +1,46 @@
-version: '3'
+version: '3.8'
 
 services:
   supabase-mcp:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-supabase-mcp-server}:${IMAGE_TAG:-latest}
     container_name: supabase-mcp-server
+    pull_policy: always
     ports:
       - "3000:3000"
     environment:
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
-      - PORT=3000
-      - GIN_MODE=release
+      # Coolify v4 compatible environment variables with defaults
+      - SUPABASE_URL=${SUPABASE_URL:-https://supabase.cantodorei.com.br:8000}
+      - SUPABASE_KEY=${SUPABASE_KEY:-${SERVICE_SUPABASESERVICE_KEY}}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-${SERVICE_SUPABASEANON_KEY}}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-${SERVICE_PASSWORD_JWT}}
+      - PG_CONNECTION_STRING=${PG_CONNECTION_STRING:-postgresql://postgres:n8vZ0pUjhUH2rct5StKpTuhVtq6Oyjge@supabase-db-mk0sogoswoss8c48480sogc0:5432/postgres}
+      - PORT=${PORT:-3000}
+      - GIN_MODE=${GIN_MODE:-release}
+      - SERVICE_FQDN_SUPABASEKONG=${SERVICE_FQDN_SUPABASEKONG}
     restart: unless-stopped
     volumes:
-      - ./logs:/app/logs
+      - mcp-logs:/app/logs
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    # No local dependencies since we're using external Supabase services
+
+  # Optional PostgreSQL database for MCP server's own data storage if needed
+  # We don't need to define the database service since we're using the existing Supabase database
+
+networks:
+  mcp-network:
+    external: true
+    name: shared
+
+volumes:
+  mcp-logs:
+    driver: local

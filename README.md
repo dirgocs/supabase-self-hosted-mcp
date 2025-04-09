@@ -17,7 +17,8 @@ Este é um servidor MCP (Model Context Protocol) personalizado para conectar fer
 
 ## Requisitos
 
-- Node.js 14.x ou superior
+- Go 1.21 ou superior
+- Docker (opcional, para execução em contêiner)
 - Acesso a uma instalação Supabase self-hosted
 - Service Role Key do seu projeto Supabase
 - Docker (para execução containerizada)
