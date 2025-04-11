@@ -5,7 +5,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    image: ${IMAGE_NAME:-supabase-mcp-server}:${IMAGE_TAG:-latest}
+    image: ${IMAGE_NAME:-supabase-self-hosted-mcp}:${IMAGE_TAG:-latest}
     container_name: supabase-mcp-server
     pull_policy: always
     ports:

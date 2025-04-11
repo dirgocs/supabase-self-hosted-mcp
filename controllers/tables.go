@@ -5,20 +5,20 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dirgocs/supabase-self-hosted-mcp/supabase"
 	"github.com/dirgocs/supabase-self-hosted-mcp/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/nedpals/supabase-go"
 )
 
 // TableController handles table-related operations
 type TableController struct {
-	supabase *supabase.Client
+	supabase *supabase.SupabaseClientExtended
 }
 
 // NewTableController creates a new table controller
-func NewTableController(supabase *supabase.Client) *TableController {
+func NewTableController(client *supabase.SupabaseClientExtended) *TableController {
 	return &TableController{
-		supabase: supabase,
+		supabase: client,
 	}
 }
 
@@ -65,23 +65,63 @@ func (tc *TableController) QueryTable(c *gin.Context) {
 	for _, condition := range req.Where {
 		switch condition.Operator {
 		case "eq":
-			query.Eq(condition.Column, condition.Value)
+			if strValue, ok := condition.Value.(string); ok {
+				query.Eq(condition.Column, strValue)
+			} else {
+				query.Eq(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		case "neq":
-			query.Neq(condition.Column, condition.Value)
+			if strValue, ok := condition.Value.(string); ok {
+				query.Neq(condition.Column, strValue)
+			} else {
+				query.Neq(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		case "gt":
-			query.Gt(condition.Column, condition.Value)
+			if strValue, ok := condition.Value.(string); ok {
+				query.Gt(condition.Column, strValue)
+			} else {
+				query.Gt(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		case "gte":
-			query.Gte(condition.Column, condition.Value)
+			if strValue, ok := condition.Value.(string); ok {
+				query.Gte(condition.Column, strValue)
+			} else {
+				query.Gte(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		case "lt":
-			query.Lt(condition.Column, condition.Value)
+			if strValue, ok := condition.Value.(string); ok {
+				query.Lt(condition.Column, strValue)
+			} else {
+				query.Lt(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		case "lte":
-			query.Lte(condition.Column, condition.Value)
+			if strValue, ok := condition.Value.(string); ok {
+				query.Lte(condition.Column, strValue)
+			} else {
+				query.Lte(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		case "like":
-			query.Like(condition.Column, condition.Value.(string))
+			if strValue, ok := condition.Value.(string); ok {
+				query.Like(condition.Column, strValue)
+			} else {
+				query.Like(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		case "ilike":
-			query.ILike(condition.Column, condition.Value.(string))
+			if strValue, ok := condition.Value.(string); ok {
+				query.Ilike(condition.Column, strValue)
+			} else {
+				query.Ilike(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		case "is":
-			query.Is(condition.Column, condition.Value)
+			// Handle IS operator with proper type conversion
+			if condition.Value == nil {
+				// For IS NULL, use an empty string as a workaround
+				query.Is(condition.Column, "")
+			} else if strValue, ok := condition.Value.(string); ok {
+				query.Is(condition.Column, strValue)
+			} else {
+				query.Is(condition.Column, fmt.Sprintf("%v", condition.Value))
+			}
 		default:
 			// Ignore unknown operators
 		}
@@ -131,16 +171,16 @@ func (tc *TableController) GenerateTypes(c *gin.Context) {
 
 	// Try to get schema information using RPC
 	var tables []SchemaTable
-	err := tc.supabase.Functions.Invoke("get_schema_information", map[string]interface{}{
+	err := tc.supabase.Functions().Invoke("get_schema_information", map[string]interface{}{
 		"p_schema": req.Schema,
 	}, &tables)
 
 	if err != nil {
 		// If RPC fails, try direct query
 		var schemaData []map[string]interface{}
-		// Since we can't use DB.From directly with the current client, use Functions.Invoke instead
+		// Use the DB object to execute a SQL query
 		query := fmt.Sprintf(`SELECT tablename FROM pg_tables WHERE schemaname = '%s'`, req.Schema)
-		err = tc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+		err = tc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 			"query": query,
 		}, &schemaData)
 
@@ -234,7 +274,7 @@ func (tc *TableController) ListTables(c *gin.Context) {
 
 	// Try using RPC first
 	var tables []map[string]interface{}
-	err := tc.supabase.Functions.Invoke("list_tables", map[string]interface{}{
+	err := tc.supabase.Functions().Invoke("list_tables", map[string]interface{}{
 		"p_schema": req.Schema,
 	}, &tables)
 
@@ -251,7 +291,7 @@ func (tc *TableController) ListTables(c *gin.Context) {
 	`, req.Schema)
 
 	var queryResult []map[string]interface{}
-	err = tc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	err = tc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": query,
 	}, &queryResult)
 
@@ -264,10 +304,10 @@ func (tc *TableController) ListTables(c *gin.Context) {
 			// Use a simple query to check if the table exists
 			query := fmt.Sprintf("SELECT * FROM %s LIMIT 1", tableName)
 			var result []map[string]interface{}
-			err := tc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+			err := tc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 				"query": query,
 			}, &result)
-			
+
 			if err == nil {
 				commonTables = append(commonTables, map[string]string{"table_name": tableName})
 			}
@@ -370,7 +410,7 @@ func (tc *TableController) CreateTable(c *gin.Context) {
 	}
 
 	var result interface{}
-	err := tc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := tc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql.String(),
 	}, &result)
 
@@ -466,7 +506,7 @@ func (tc *TableController) AlterTable(c *gin.Context) {
 
 	for _, sql := range sqls {
 		var result interface{}
-		err := tc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+		err := tc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 			"query": sql,
 		}, &result)
 
@@ -538,7 +578,7 @@ func (tc *TableController) DropTable(c *gin.Context) {
 	}
 
 	var result interface{}
-	err := tc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := tc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 

@@ -9,10 +9,10 @@ import (
 
 	"github.com/dirgocs/supabase-self-hosted-mcp/config"
 	"github.com/dirgocs/supabase-self-hosted-mcp/controllers"
+	"github.com/dirgocs/supabase-self-hosted-mcp/supabase"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/nedpals/supabase-go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,17 +26,37 @@ func main() {
 	// Initialize configuration
 	cfg := config.LoadConfig()
 
-	// Initialize Supabase client
-	supabaseClient := supabase.CreateClient(cfg.Supabase.URL, cfg.Supabase.Key)
+	// Initialize extended Supabase client with Functions support
+	supabaseClient := supabase.CreateClientExtended(cfg.Supabase.URL, cfg.Supabase.Key)
 	
-	// Set up the client with additional options
-	// Add the service role key to the Auth header for admin operations
-	supabaseClient.Auth.Header.Add("apikey", cfg.Supabase.Key)
-	// Also add it as a Bearer token for services that require it
-	supabaseClient.Auth.Header.Add("Authorization", "Bearer "+cfg.Supabase.Key)
+	// The headers are already set up in the CreateClientExtended function
+	// No need to manually set them here
 
 	// Set up Gin router
 	router := gin.Default()
+
+	// Configure trusted proxies
+	// For Cloudflare, we need to trust their IP ranges
+	// See: https://www.cloudflare.com/ips/
+	// For simplicity in a Docker/Coolify environment, we can trust the local subnet
+	// and Cloudflare's proxy
+	trustedProxies := []string{
+		"10.0.0.0/8",     // Private network range often used in Docker
+		"172.16.0.0/12",  // Private network range often used in Docker
+		"192.168.0.0/16", // Private network range
+		// Cloudflare IPv4 ranges - you may want to keep these updated
+		"173.245.48.0/20",
+		"103.21.244.0/22",
+		"103.22.200.0/22",
+		"103.31.4.0/22",
+		"141.101.64.0/18",
+		"108.162.192.0/18",
+		"190.93.240.0/20",
+		"188.114.96.0/20",
+		"197.234.240.0/22",
+		"198.41.128.0/17",
+	}
+	router.SetTrustedProxies(trustedProxies)
 
 	// Apply CORS middleware
 	router.Use(cors.Default())
@@ -106,12 +126,12 @@ func main() {
 	router.POST("/v1/delete_bucket_policy", storageController.DeleteBucketPolicy)
 
 	// Register edge function endpoints
-	edgeFunctionController := controllers.NewEdgeFunctionController(supabaseClient)
-	router.POST("/v1/get_edge_functions", edgeFunctionController.GetEdgeFunctions)
-	router.POST("/v1/create_edge_function", edgeFunctionController.CreateEdgeFunction)
-	router.POST("/v1/update_edge_function", edgeFunctionController.UpdateEdgeFunction)
-	router.POST("/v1/delete_edge_function", edgeFunctionController.DeleteEdgeFunction)
-	router.POST("/v1/deploy_edge_function", edgeFunctionController.DeployEdgeFunction)
+	edgeFunctionsController := controllers.NewEdgeFunctionsController(supabaseClient)
+	router.POST("/v1/get_edge_functions", edgeFunctionsController.GetEdgeFunctions)
+	router.POST("/v1/create_edge_function", edgeFunctionsController.CreateEdgeFunction)
+	router.POST("/v1/update_edge_function", edgeFunctionsController.UpdateEdgeFunction)
+	router.POST("/v1/delete_edge_function", edgeFunctionsController.DeleteEdgeFunction)
+	router.POST("/v1/deploy_edge_function", edgeFunctionsController.DeployEdgeFunction)
 
 	// Start the server
 	port := fmt.Sprintf(":%d", cfg.Server.Port)

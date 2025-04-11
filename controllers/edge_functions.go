@@ -6,19 +6,19 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dirgocs/supabase-self-hosted-mcp/supabase"
 	"github.com/gin-gonic/gin"
-	"github.com/nedpals/supabase-go"
 )
 
-// EdgeFunctionController handles edge function-related operations
-type EdgeFunctionController struct {
-	supabase *supabase.Client
+// EdgeFunctionsController handles edge functions-related operations
+type EdgeFunctionsController struct {
+	supabase *supabase.SupabaseClientExtended
 }
 
-// NewEdgeFunctionController creates a new edge function controller
-func NewEdgeFunctionController(supabase *supabase.Client) *EdgeFunctionController {
-	return &EdgeFunctionController{
-		supabase: supabase,
+// NewEdgeFunctionsController creates a new edge functions controller
+func NewEdgeFunctionsController(client *supabase.SupabaseClientExtended) *EdgeFunctionsController {
+	return &EdgeFunctionsController{
+		supabase: client,
 	}
 }
 
@@ -28,7 +28,7 @@ type GetEdgeFunctionsRequest struct {
 }
 
 // GetEdgeFunctions gets edge functions
-func (efc *EdgeFunctionController) GetEdgeFunctions(c *gin.Context) {
+func (efc *EdgeFunctionsController) GetEdgeFunctions(c *gin.Context) {
 	var req GetEdgeFunctionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -46,7 +46,7 @@ func (efc *EdgeFunctionController) GetEdgeFunctions(c *gin.Context) {
 	}
 
 	var result []map[string]interface{}
-	err := efc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := efc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": query,
 	}, &result)
 
@@ -76,7 +76,7 @@ type CreateEdgeFunctionRequest struct {
 }
 
 // CreateEdgeFunction creates a new edge function
-func (efc *EdgeFunctionController) CreateEdgeFunction(c *gin.Context) {
+func (efc *EdgeFunctionsController) CreateEdgeFunction(c *gin.Context) {
 	var req CreateEdgeFunctionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -114,7 +114,7 @@ func (efc *EdgeFunctionController) CreateEdgeFunction(c *gin.Context) {
 	`, req.Name, code, req.VerifyJWT, importMapStr)
 
 	var insertResult interface{}
-	err = efc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	err = efc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": insertQuery,
 	}, &insertResult)
 
@@ -143,7 +143,7 @@ type UpdateEdgeFunctionRequest struct {
 }
 
 // UpdateEdgeFunction updates an existing edge function
-func (efc *EdgeFunctionController) UpdateEdgeFunction(c *gin.Context) {
+func (efc *EdgeFunctionsController) UpdateEdgeFunction(c *gin.Context) {
 	var req UpdateEdgeFunctionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -184,7 +184,7 @@ func (efc *EdgeFunctionController) UpdateEdgeFunction(c *gin.Context) {
 	updateQuery += fmt.Sprintf(`, updated_at = NOW() WHERE name = '%s'`, req.Name)
 
 	var updateResult interface{}
-	err := efc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := efc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": updateQuery,
 	}, &updateResult)
 
@@ -210,7 +210,7 @@ type DeleteEdgeFunctionRequest struct {
 }
 
 // DeleteEdgeFunction deletes an edge function
-func (efc *EdgeFunctionController) DeleteEdgeFunction(c *gin.Context) {
+func (efc *EdgeFunctionsController) DeleteEdgeFunction(c *gin.Context) {
 	var req DeleteEdgeFunctionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -231,7 +231,7 @@ func (efc *EdgeFunctionController) DeleteEdgeFunction(c *gin.Context) {
 	`, req.Name)
 
 	var deleteResult interface{}
-	err := efc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := efc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": deleteQuery,
 	}, &deleteResult)
 
@@ -257,7 +257,7 @@ type DeployEdgeFunctionRequest struct {
 }
 
 // DeployEdgeFunction deploys an edge function
-func (efc *EdgeFunctionController) DeployEdgeFunction(c *gin.Context) {
+func (efc *EdgeFunctionsController) DeployEdgeFunction(c *gin.Context) {
 	var req DeployEdgeFunctionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

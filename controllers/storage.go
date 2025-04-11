@@ -1,24 +1,26 @@
 package controllers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
+	"github.com/dirgocs/supabase-self-hosted-mcp/supabase"
 	"github.com/gin-gonic/gin"
-	"github.com/nedpals/supabase-go"
 )
 
 // StorageController handles storage-related operations
 type StorageController struct {
-	supabase *supabase.Client
+	supabase *supabase.SupabaseClientExtended
 }
 
 // NewStorageController creates a new storage controller
-func NewStorageController(supabase *supabase.Client) *StorageController {
+func NewStorageController(client *supabase.SupabaseClientExtended) *StorageController {
 	return &StorageController{
-		supabase: supabase,
+		supabase: client,
 	}
 }
 
@@ -42,7 +44,7 @@ func (sc *StorageController) GetBuckets(c *gin.Context) {
 	}
 
 	var result []map[string]interface{}
-	err := sc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := sc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": query,
 	}, &result)
 
@@ -121,7 +123,7 @@ func (sc *StorageController) CreateBucket(c *gin.Context) {
 	`, req.ID, req.Name, req.Public, fileSizeLimitStr, allowedMimeTypesStr)
 
 	var result interface{}
-	err := sc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := sc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 
@@ -169,9 +171,13 @@ func (sc *StorageController) UpdateBucket(c *gin.Context) {
 		sql += fmt.Sprintf(`, file_size_limit = %d`, *req.FileSizeLimit)
 	} else {
 		// If explicitly set to nil in the request
-		if c.Request.ContentLength > 0 && strings.Contains(c.Request.Body.(*gin.Request).Body, "file_size_limit") {
+		// Check if the request body contains file_size_limit
+		bodyBytes, _ := c.GetRawData()
+		if len(bodyBytes) > 0 && strings.Contains(string(bodyBytes), "file_size_limit") {
 			sql += `, file_size_limit = NULL`
 		}
+		// Reset the request body for further processing
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
 
 	if req.AllowedMimeTypes != nil {
@@ -190,7 +196,7 @@ func (sc *StorageController) UpdateBucket(c *gin.Context) {
 	sql += fmt.Sprintf(` WHERE id = '%s'`, req.ID)
 
 	var result interface{}
-	err := sc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := sc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 
@@ -227,7 +233,7 @@ func (sc *StorageController) DeleteBucket(c *gin.Context) {
 	sql := fmt.Sprintf(`DELETE FROM storage.buckets WHERE id = '%s'`, req.ID)
 
 	var result interface{}
-	err := sc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := sc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 
@@ -278,7 +284,7 @@ func (sc *StorageController) GetBucketPolicies(c *gin.Context) {
 	`, req.BucketID)
 
 	var result []map[string]interface{}
-	err := sc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := sc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": query,
 	}, &result)
 
@@ -347,7 +353,7 @@ func (sc *StorageController) CreateBucketPolicy(c *gin.Context) {
 	`, req.Name, req.BucketID, opCode, definition, req.Role)
 
 	var result interface{}
-	err := sc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := sc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 
@@ -396,7 +402,7 @@ func (sc *StorageController) UpdateBucketPolicy(c *gin.Context) {
 	`, definition, req.BucketID, req.Name)
 
 	var result interface{}
-	err := sc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := sc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 
@@ -438,7 +444,7 @@ func (sc *StorageController) DeleteBucketPolicy(c *gin.Context) {
 	`, req.BucketID, req.Name)
 
 	var result interface{}
-	err := sc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	err := sc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 

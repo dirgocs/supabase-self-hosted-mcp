@@ -1,37 +1,35 @@
-# Use a specific version of golang to avoid compatibility issues
-FROM golang:1.21 as builder
+# Build stage
+FROM golang:1.21-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy go.mod first to leverage Docker cache
+# Copy go.mod and go.sum
 COPY go.mod ./
+COPY go.sum ./
 
-# Copy the rest of the code
+# Download dependencies
+RUN go mod download
+
+# Copy the source code
 COPY . .
 
-# Download dependencies and build
-RUN go mod tidy
-RUN go build -o server .
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server .
 
-# Use a smaller image for the final container
-FROM debian:bullseye-slim
-
-# Install CA certificates for HTTPS connections and curl for healthchecks
-RUN apt-get update && \
-    apt-get install -y ca-certificates curl && \
-    rm -rf /var/lib/apt/lists/*
+# Final stage
+FROM alpine:3.18
 
 WORKDIR /app
+
+# Install curl for healthcheck
+RUN apk --no-cache add curl
+
+# Copy the binary from builder
+COPY --from=builder /app/server /app/
+COPY --from=builder /app/.env* /app/
 
 # Create logs directory
 RUN mkdir -p /app/logs
-
-# Copy the binary from the builder stage
-COPY --from=builder /app/server /app/server
-
-# Copy the .env file if it exists
-COPY .env* /app/
 
 # Expose the port
 EXPOSE 3000

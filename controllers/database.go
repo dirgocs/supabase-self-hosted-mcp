@@ -1,24 +1,26 @@
 package controllers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
+	"github.com/dirgocs/supabase-self-hosted-mcp/supabase"
+	"github.com/dirgocs/supabase-self-hosted-mcp/types"
 	"github.com/dirgocs/supabase-self-hosted-mcp/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/nedpals/supabase-go"
 )
+
+
 
 // DatabaseController handles database-related operations
 type DatabaseController struct {
-	supabase *supabase.Client
+	supabase *supabase.SupabaseClientExtended
 }
 
 // NewDatabaseController creates a new database controller
-func NewDatabaseController(supabase *supabase.Client) *DatabaseController {
+func NewDatabaseController(client *supabase.SupabaseClientExtended) *DatabaseController {
 	return &DatabaseController{
-		supabase: supabase,
+		supabase: client,
 	}
 }
 
@@ -48,9 +50,10 @@ func (dc *DatabaseController) ExecuteQuery(c *gin.Context) {
 		return
 	}
 
-	// Execute query through RPC
+	// Execute query through Functions API
 	var result interface{}
-	err := dc.supabase.Functions.Invoke("execute_sql", map[string]interface{}{
+	// Use the Functions API to execute the query
+	err := dc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": req.Query,
 	}, &result)
 
@@ -75,13 +78,13 @@ type SchemaData map[string]map[string]TableSchema
 
 // TableSchema represents the schema of a table
 type TableSchema struct {
-	Columns     []Column     `json:"columns"`
-	PrimaryKeys []string     `json:"primary_keys"`
-	ForeignKeys []ForeignKey `json:"foreign_keys"`
+	Columns     []DatabaseColumn `json:"columns"`
+	PrimaryKeys []string        `json:"primary_keys"`
+	ForeignKeys []ForeignKey    `json:"foreign_keys"`
 }
 
-// Column represents a column in a table
-type Column struct {
+// DatabaseColumn represents a column in a table schema
+type DatabaseColumn struct {
 	Name         string `json:"name"`
 	Type         string `json:"type"`
 	NotNull      bool   `json:"not_null"`
@@ -179,8 +182,8 @@ func (dc *DatabaseController) GetDatabaseSchema(c *gin.Context) {
 	query += " ORDER BY n.nspname, c.relname, a.attnum"
 
 	// Execute query through RPC
-	var rawData []SchemaItem
-	err := dc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	var rawData []types.SchemaItem
+	err := dc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": query,
 	}, &rawData)
 
@@ -190,26 +193,26 @@ func (dc *DatabaseController) GetDatabaseSchema(c *gin.Context) {
 	}
 
 	// Process data into a more user-friendly structure
-	schemaData := make(SchemaData)
+	schemaData := make(types.SchemaData)
 
 	for _, item := range rawData {
 		schemaName := item.SchemaName
 		tableName := item.TableName
 
 		if _, exists := schemaData[schemaName]; !exists {
-			schemaData[schemaName] = make(map[string]TableSchema)
+			schemaData[schemaName] = make(map[string]types.TableSchema)
 		}
 
 		if _, exists := schemaData[schemaName][tableName]; !exists {
-			schemaData[schemaName][tableName] = TableSchema{
-				Columns:     []Column{},
+			schemaData[schemaName][tableName] = types.TableSchema{
+				Columns:     []types.DatabaseColumn{},
 				PrimaryKeys: []string{},
-				ForeignKeys: []ForeignKey{},
+				ForeignKeys: []types.ForeignKey{},
 			}
 		}
 
 		// Add column
-		column := Column{
+		column := types.DatabaseColumn{
 			Name:         item.ColumnName,
 			Type:         item.DataType,
 			NotNull:      item.NotNull,
@@ -226,12 +229,11 @@ func (dc *DatabaseController) GetDatabaseSchema(c *gin.Context) {
 
 		// Add foreign key
 		if item.IsForeignKey {
-			tableSchema.ForeignKeys = append(tableSchema.ForeignKeys, ForeignKey{
+			tableSchema.ForeignKeys = append(tableSchema.ForeignKeys, types.ForeignKey{
 				Column: item.ColumnName,
-				References: ForeignKeyReference{
-					Schema: item.ReferenceSchema,
-					Table:  item.ReferenceTable,
-					Column: item.ReferenceColumn,
+				References: types.ForeignKeyReference{
+					Table: item.ReferencedTable,
+					Column: item.ReferencedColumn,
 				},
 			})
 		}
@@ -263,7 +265,7 @@ func (dc *DatabaseController) CreateSchema(c *gin.Context) {
 	sql := fmt.Sprintf(`CREATE SCHEMA IF NOT EXISTS "%s"`, req.Name)
 
 	var result interface{}
-	err := dc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	err := dc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 
@@ -304,7 +306,7 @@ func (dc *DatabaseController) DeleteSchema(c *gin.Context) {
 	}
 
 	var result interface{}
-	err := dc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	err := dc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 
@@ -388,21 +390,18 @@ func (dc *DatabaseController) GetRLSPolicies(c *gin.Context) {
 
 	query += " ORDER BY n.nspname, c.relname, p.polname"
 
-	// Convert params to JSON string for RPC call
-	paramsJSON, err := json.Marshal(params)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	var policies []types.RLSPolicy
 
-	var policies []RLSPolicy
-	err = dc.supabase.DB.RPC("execute_sql", map[string]interface{}{
-		"query":  query,
-		"params": string(paramsJSON),
+	// Execute the query to get RLS policies
+	err := dc.supabase.Functions().Invoke("get_rls_policies", map[string]interface{}{
+		"query": query,
+		"params": params,
 	}, &policies)
-
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   err.Error(),
+			"message": "Unable to execute query. You may need to create a custom function 'execute_sql' in your Supabase instance.",
+		})
 		return
 	}
 
@@ -456,7 +455,7 @@ func (dc *DatabaseController) CreateRLSPolicy(c *gin.Context) {
 	}
 
 	var result interface{}
-	err := dc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	err := dc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 
@@ -504,7 +503,7 @@ func (dc *DatabaseController) UpdateRLSPolicy(c *gin.Context) {
 	// First drop the existing policy
 	dropSQL := fmt.Sprintf(`DROP POLICY IF EXISTS "%s" ON %s`, req.Name, tableIdentifier)
 	var dropResult interface{}
-	err := dc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	err := dc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": dropSQL,
 	}, &dropResult)
 
@@ -529,7 +528,7 @@ func (dc *DatabaseController) UpdateRLSPolicy(c *gin.Context) {
 	}
 
 	var createResult interface{}
-	err = dc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	err = dc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": createSQL,
 	}, &createResult)
 
@@ -573,7 +572,7 @@ func (dc *DatabaseController) DeleteRLSPolicy(c *gin.Context) {
 	sql := fmt.Sprintf(`DROP POLICY IF EXISTS "%s" ON %s`, req.Name, tableIdentifier)
 
 	var result interface{}
-	err := dc.supabase.DB.RPC("execute_sql", map[string]interface{}{
+	err := dc.supabase.Functions().Invoke("execute_sql", map[string]interface{}{
 		"query": sql,
 	}, &result)
 

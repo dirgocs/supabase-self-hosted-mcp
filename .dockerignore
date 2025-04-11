@@ -1,0 +1,42 @@
+# Binaries and executables
+*.exe
+*.msi
+*.dll
+*.so
+*.dylib
+
+# Go build files
+/bin/
+/pkg/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/logs/
+
+# Test files
+*_test.go
+/test/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Misc
+README.md
+LICENSE
+*.md

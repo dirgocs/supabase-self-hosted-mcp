@@ -1,104 +1,198 @@
-# Servidor MCP para Supabase Self-Hosted
+# Supabase Self-Hosted MCP Server
 
-Este é um servidor MCP (Model Context Protocol) personalizado para conectar ferramentas de IA (como Claude, Cursor, etc.) com instalações self-hosted do Supabase.
+This is a custom MCP (Model Context Protocol) server implemented in Go for connecting AI tools (like Claude, Cursor, etc.) with self-hosted Supabase installations. It provides a comprehensive API for managing your Supabase resources.
 
-## Características
+## Features
 
-- Consulta de tabelas no banco de dados PostgreSQL do Supabase
-- Listagem de tabelas disponíveis
-- Geração de tipos TypeScript para facilitar o desenvolvimento
-- Execução de consultas SQL com restrições de segurança
-- Compatível com o protocolo MCP para integração com ferramentas de IA
-- Gerenciamento de RLS (Row Level Security)
-- Gerenciamento de Edge Functions
-- Gerenciamento de esquemas de banco de dados
-- Gerenciamento de tabelas
-- Gerenciamento de buckets de armazenamento e suas políticas
+- Query tables in the Supabase PostgreSQL database
+- List available tables and schemas
+- Generate TypeScript types to facilitate development
+- Execute SQL queries with security restrictions (including migrations)
+- Compatible with the MCP protocol for integration with AI tools
+- Row Level Security (RLS) management
+- Edge Functions management
+- Database schema management
+- Table management
+- Storage bucket management and policies
+- RESTful API for programmatic access
 
-## Requisitos
+## Requirements
 
-- Go 1.21 ou superior
-- Docker (opcional, para execução em contêiner)
-- Acesso a uma instalação Supabase self-hosted
-- Service Role Key do seu projeto Supabase
-- Docker (para execução containerizada)
+- Go 1.21 or higher
+- Docker (optional, for containerized execution)
+- Access to a self-hosted Supabase installation
+- Service Role Key from your Supabase project
+- Coolify v4.0.0-beta.406 or higher (for Coolify deployment)
 
-## Instalação
+## Installation
 
-### Instalação via Docker (Recomendado)
+### Docker Installation (Recommended)
 
-1. Use a imagem Docker:
+1. Use the Docker image:
    ```bash
-   docker run -p 3000:3000 -e SUPABASE_URL=http://seu-servidor-supabase:8000 -e SUPABASE_KEY=seu-service-role-key dirgocs/supabase-self-hosted-mcp
+   docker run -p 3000:3000 -e SUPABASE_URL=http://your-supabase-server:8000 -e SUPABASE_KEY=your-service-role-key dirgocs/supabase-self-hosted-mcp:1.0.0
    ```
 
-### Instalação Manual
+### Manual Installation
 
-1. Clone este repositório:
+1. Clone this repository:
    ```bash
    git clone https://github.com/dirgocs/supabase-self-hosted-mcp.git
    cd supabase-self-hosted-mcp
    ```
 
-2. Instale as dependências:
+2. Build the application:
    ```bash
-   npm install
+   go build -o supabase-mcp
    ```
 
-3. Configure as variáveis de ambiente:
+3. Configure environment variables:
    ```bash
    cp .env.example .env
    ```
    
-   Edite o arquivo `.env` e configure as seguintes variáveis:
-   - `SUPABASE_URL`: URL da sua instalação Supabase self-hosted
-   - `SUPABASE_KEY`: Service Role Key do seu projeto Supabase
-   - `PORT`: Porta em que o servidor MCP será executado (padrão: 3000)
+   Edit the `.env` file and configure the following variables:
+   - `SUPABASE_URL`: URL of your self-hosted Supabase installation
+   - `SUPABASE_KEY`: Service Role Key from your Supabase project
+   - `SUPABASE_ANON_KEY`: Anonymous Key for public operations
+   - `SUPABASE_JWT_SECRET`: JWT Secret used for token verification
+   - `PG_CONNECTION_STRING`: Direct PostgreSQL connection string (optional)
+   - `PORT`: Port on which the MCP server will run (default: 3000)
+   - `GIN_MODE`: Gin framework mode (debug or release)
 
-4. Execute o servidor:
+4. Run the server:
    ```bash
-   npm start
+   ./supabase-mcp
    ```
 
-## Uso com Claude ou outras ferramentas de IA
+### Coolify Installation
 
-1. Inicie o servidor MCP usando o comando acima
-2. Configure sua ferramenta de IA para usar o servidor MCP:
+This MCP server is designed to work with Coolify v4.0.0-beta.406 or higher. You can deploy it directly from the GitHub repository using Coolify's Docker deployment feature.
 
-### Configuração para Claude
+1. In Coolify, create a new service
+2. Select GitHub repository as the source
+3. Configure the environment variables:
+   - `SUPABASE_URL`: URL of your self-hosted Supabase installation
+   - `SUPABASE_KEY`: Service Role Key from your Supabase project
+   - `SUPABASE_ANON_KEY`: Anonymous Key for public operations
+   - `SUPABASE_JWT_SECRET`: JWT Secret for token verification
+   - `PG_CONNECTION_STRING`: Direct PostgreSQL connection string (optional)
+4. Deploy the service
+
+The Docker configuration is already optimized for Coolify deployment.
+
+## Using with Claude or other AI tools
+
+1. Start the MCP server using the command above
+2. Configure your AI tool to use the MCP server:
+
+### Configuration for Claude
 
 ```json
 {
   "mcpServers": {
     "supabase-self-hosted": {
-      "command": "node",
-      "args": ["index.js"],
-      "cwd": "/caminho/para/supabase-self-hosted-mcp",
+      "command": "./supabase-mcp",
+      "cwd": "/path/to/supabase-self-hosted-mcp",
       "env": {
-        "SUPABASE_URL": "http://seu-servidor-supabase:8000",
-        "SUPABASE_KEY": "seu-service-role-key"
+        "SUPABASE_URL": "http://your-supabase-server:8000",
+        "SUPABASE_KEY": "your-service-role-key"
       }
     }
   }
 }
 ```
 
-### Configuração para Cursor ou Windsurf
+### Configuration for Cursor or Windsurf
 
 ```json
 {
   "name": "Supabase Self-Hosted",
-  "command": "node",
-  "args": ["index.js"],
-  "cwd": "/caminho/para/supabase-self-hosted-mcp",
+  "command": "./supabase-mcp",
+  "cwd": "/path/to/supabase-self-hosted-mcp",
   "env": {
-    "SUPABASE_URL": "http://seu-servidor-supabase:8000", 
-    "SUPABASE_KEY": "seu-service-role-key"
+    "SUPABASE_URL": "http://your-supabase-server:8000", 
+    "SUPABASE_KEY": "your-service-role-key"
   }
 }
 ```
 
-## Funções disponíveis
+### Using with Docker
+
+If you're using the Docker container, you can configure your AI tool to connect to the exposed port (default: 3000) of the container.
+
+## Available Endpoints
+
+The MCP server provides the following API endpoints:
+
+### Database Management
+- `GET /api/database/schema`: Get database schema information
+- `POST /api/database/query`: Execute SQL queries
+- `GET /api/database/rls`: Get RLS policies
+
+### Table Management
+- `GET /api/tables`: List available tables
+- `GET /api/tables/:table`: Get table details
+- `POST /api/tables/:table/query`: Query table data
+- `GET /api/tables/types`: Generate TypeScript types
+
+### Storage Management
+- `GET /api/storage/buckets`: List storage buckets
+- `POST /api/storage/buckets`: Create a new bucket
+- `PUT /api/storage/buckets/:id`: Update bucket settings
+- `DELETE /api/storage/buckets/:id`: Delete a bucket
+
+### Edge Functions Management
+- `GET /api/edge-functions`: List edge functions
+- `POST /api/edge-functions`: Create a new edge function
+- `PUT /api/edge-functions/:name`: Update an edge function
+- `DELETE /api/edge-functions/:name`: Delete an edge function
+
+## Running SQL Migrations
+
+You can use the `/api/database/query` endpoint to run SQL migrations. Simply send a POST request with your SQL migration script:
+
+```bash
+curl -X POST http://localhost:3000/api/database/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "CREATE TABLE IF NOT EXISTS my_table (id SERIAL PRIMARY KEY, name TEXT);"}'
+```
+
+For complex migrations, you can execute multiple statements in a transaction:
+
+```bash
+curl -X POST http://localhost:3000/api/database/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "BEGIN; CREATE TABLE IF NOT EXISTS my_table (id SERIAL PRIMARY KEY, name TEXT); CREATE INDEX idx_my_table_name ON my_table(name); COMMIT;"}'
+```
+
+## Docker Network Configuration
+
+When running with Docker, you can use a shared network to connect to your Supabase services:
+
+```yaml
+services:
+  mcp-server:
+    image: dirgocs/supabase-self-hosted-mcp:1.0.0
+    environment:
+      - SUPABASE_URL=http://kong:8000
+      - SUPABASE_KEY=your-service-role-key
+    networks:
+      - supabase-network
+
+networks:
+  supabase-network:
+    external: true
+```
+
+## Security Considerations
+
+This MCP server uses the Supabase Service Role Key, which has full access to your database. Make sure to:
+
+1. Keep your `.env` file secure and never commit it to version control
+2. Restrict access to the MCP server to trusted users only
+3. Consider implementing additional authentication for the MCP server
+4. Run the server in a secure environment
 
 ### Tabelas e Consultas
 - `query_table`: Consultar uma tabela específica com suporte a filtros
